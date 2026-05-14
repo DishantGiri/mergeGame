@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>Drinks Merge – Shoot & Merge!</title>
+  <meta name="description" content="Shoot tropical drinks, merge matching ones to create bigger drinks!"/>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <!-- Score HUD -->
+  <div id="hud">
+    <div class="hud-box">
+      <div class="hud-label">SCORE</div>
+      <div id="score-val">0</div>
+    </div>
+    <div id="hud-title">🍹 Drinks Merge</div>
+    <div class="hud-box">
+      <div class="hud-label">BEST</div>
+      <div id="best-val">0</div>
+    </div>
+  </div>
+
+  <!-- Next drink preview -->
+  <div id="next-panel">
+    <span class="next-label">NEXT</span>
+    <div id="next-drink"></div>
+  </div>
+
+  <!-- Canvas -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- Popups container -->
+  <div id="popups"></div>
+
+  <!-- Game Over Overlay -->
+  <div id="overlay-gameover" class="overlay hidden">
+    <div class="ov-card">
+      <div class="ov-icon">🍹</div>
+      <h2>Game Over!</h2>
+      <p>The drinks overflowed!</p>
+      <div class="ov-scores">
+        <div>Score <strong id="final-score">0</strong></div>
+        <div>Best <strong id="final-best">0</strong></div>
+      </div>
+      <button id="btn-restart">Play Again 🔄</button>
+    </div>
+  </div>
+
+  <!-- Win Overlay (Royal Elixir) -->
+  <div id="overlay-win" class="overlay hidden">
+    <div class="ov-card gold">
+      <div class="ov-icon">👑</div>
+      <h2>You Win!</h2>
+      <p>You created the Royal Elixir!</p>
+      <button id="btn-win-restart">Play Again 🔄</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

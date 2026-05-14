@@ -38,6 +38,8 @@ let canShoot = true, cooldown = 0;
 let gameOver = false;
 let scale = 1;            // canvas CSS scale
 let collected = 0;        // how many royal elixirs collected
+let isMuted = false;
+let musicStarted = false;
 
 // ─── INIT ────────────────────────────────────────────────────
 function init(restart) {
@@ -585,27 +587,71 @@ function spawnPopup(screenX, screenY, text) {
 }
 
 // ─── AUDIO (Web Audio API) ────────────────────────────────────
-let actx;
-function getACtx() { return actx || (actx = new (window.AudioContext||window.webkitAudioContext)()); }
-function tone(freq, type, dur, vol=0.25) {
-  try {
-    const c=getACtx(), o=c.createOscillator(), g=c.createGain();
-    o.connect(g); g.connect(c.destination);
-    o.type=type; o.frequency.value=freq;
-    g.gain.setValueAtTime(vol,c.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+dur);
-    o.start(); o.stop(c.currentTime+dur);
-  } catch(e){}
+let actx, musicNode;
+
+function getACtx() {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
 }
-function playShoot() { tone(480,'triangle',0.1,0.2); }
+
+function tone(freq, type, dur, vol = 0.25) {
+  if (isMuted) return;
+  try {
+    const c = getACtx(), o = c.createOscillator(), g = c.createGain();
+    o.connect(g); g.connect(c.destination);
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+    o.start(); o.stop(c.currentTime + dur);
+  } catch (e) {}
+}
+
+// Simple tropical background loop
+function startMusic() {
+  if (musicStarted) return;
+  musicStarted = true;
+  const c = getACtx();
+  const tempo = 120;
+  const step = 60 / tempo / 2; // 8th notes
+
+  function playBeat(t) {
+    if (isMuted) return;
+    // Bass note
+    const b = c.createOscillator(), bg = c.createGain();
+    b.type = 'sine'; b.frequency.value = 82.41; // E2
+    b.connect(bg); bg.connect(c.destination);
+    bg.gain.setValueAtTime(0.1, t);
+    bg.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    b.start(t); b.stop(t + 0.4);
+
+    // Percussive click
+    const p = c.createOscillator(), pg = c.createGain();
+    p.type = 'square'; p.frequency.value = 1200;
+    p.connect(pg); pg.connect(c.destination);
+    pg.gain.setValueAtTime(0.02, t + step);
+    pg.gain.exponentialRampToValueAtTime(0.001, t + step + 0.05);
+    p.start(t + step); p.stop(t + step + 0.05);
+  }
+
+  let nextBeat = c.currentTime;
+  setInterval(() => {
+    while (nextBeat < c.currentTime + 0.1) {
+      playBeat(nextBeat);
+      nextBeat += step * 4; // every quarter note
+    }
+  }, 50);
+}
+
+function playShoot() { tone(480, 'triangle', 0.1, 0.15); }
 function playMerge(lv) {
-  const f=280+lv*70;
-  tone(f,'sine',0.25,0.3);
-  setTimeout(()=>tone(f*1.5,'sine',0.18,0.22),110);
+  const f = 280 + lv * 70;
+  tone(f, 'sine', 0.25, 0.2);
+  setTimeout(() => tone(f * 1.5, 'sine', 0.18, 0.15), 110);
 }
 function playCollect() {
   // Victory jingle
-  [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,'sine',0.3,0.3),i*100));
+  [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 'sine', 0.3, 0.25), i * 100));
 }
 
 // ─── GAME OVER ───────────────────────────────────────────────
@@ -632,9 +678,23 @@ function setupInput() {
     return (cx - r.left) / scale;
   }
   canvas.addEventListener('mousemove', e => { shooterX = toCanvasX(e.clientX); });
-  canvas.addEventListener('click',     e => { if(!gameOver) shoot(toCanvasX(e.clientX)); });
+  canvas.addEventListener('click',     e => { 
+    startMusic();
+    if(!gameOver) shoot(toCanvasX(e.clientX)); 
+  });
   canvas.addEventListener('touchmove', e => { e.preventDefault(); shooterX = toCanvasX(e.touches[0].clientX); }, {passive:false});
-  canvas.addEventListener('touchend',  e => { e.preventDefault(); if(!gameOver) shoot(toCanvasX(e.changedTouches[0].clientX)); }, {passive:false});
+  canvas.addEventListener('touchend',  e => { 
+    e.preventDefault(); 
+    startMusic();
+    if(!gameOver) shoot(toCanvasX(e.changedTouches[0].clientX)); 
+  }, {passive:false});
+
+  document.getElementById('btn-mute').addEventListener('click', () => {
+    isMuted = !isMuted;
+    document.getElementById('btn-mute').classList.toggle('muted', isMuted);
+    getACtx(); // resume if needed
+    if (!isMuted) startMusic();
+  });
 
   document.getElementById('btn-restart').addEventListener('click', () => { init(true); });
 }

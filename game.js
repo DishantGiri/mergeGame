@@ -4,16 +4,16 @@ const { Engine, World, Bodies, Body, Events, Composite } = Matter;
 
 // ─── DRINK DEFINITIONS ───────────────────────────────────────
 const DRINKS = [
-  { level:1,  emoji:'🥤', name:'Soda Cup',       r:22,  c1:'#ffe8a0', c2:'#d4900a', pts:10    },
-  { level:2,  emoji:'🧃', name:'Juice Box',       r:30,  c1:'#ffd090', c2:'#c06a00', pts:20    },
-  { level:3,  emoji:'🍋', name:'Lemonade',        r:40,  c1:'#ffe566', c2:'#a88000', pts:40    },
+  { level:1,  emoji:'🧃', name:'Juice Box',       r:22,  c1:'#a0f0b0', c2:'#006830', pts:10    },
+  { level:2,  emoji:'🥥', name:'Coconut',         r:30,  c1:'#d2b48c', c2:'#8b4513', pts:20    },
+  { level:3,  emoji:'🥤', name:'Soda Cup',        r:40,  c1:'#ffe8a0', c2:'#d4900a', pts:40    },
   { level:4,  emoji:'🥛', name:'Milkshake',       r:51,  c1:'#e8e0ff', c2:'#6040d0', pts:80    },
-  { level:5,  emoji:'🍵', name:'Green Smoothie',  r:63,  c1:'#a0f0b0', c2:'#006830', pts:160   },
+  { level:5,  emoji:'🍵', name:'Green Tea',       r:63,  c1:'#d0f0d0', c2:'#2ecc71', pts:160   },
   { level:6,  emoji:'🧋', name:'Bubble Tea',      r:76,  c1:'#90d8ff', c2:'#004cb0', pts:320   },
   { level:7,  emoji:'🍹', name:'Tropical Punch',  r:90,  c1:'#ffb0d0', c2:'#b00050', pts:640   },
   { level:8,  emoji:'🥂', name:'Sparkling Mix',   r:105, c1:'#ffd0b0', c2:'#903000', pts:1280  },
   { level:9,  emoji:'🍸', name:'Cocktail',        r:121, c1:'#d0b0ff', c2:'#500090', pts:2560  },
-  { level:10, emoji:'🫗', name:'Premium Blend',   r:138, c1:'#a0f8f0', c2:'#006060', pts:5120  },
+  { level:10, emoji:'🍷', name:'Fine Wine',       r:138, c1:'#ffcccc', c2:'#c0392b', pts:5120  },
   { level:11, emoji:'🏆', name:'Golden Nectar',   r:156, c1:'#fff0a0', c2:'#806000', pts:10240 },
   { level:12, emoji:'👑', name:'Royal Elixir',    r:170, c1:'#ffd700', c2:'#8b0000', pts:20480 },
 ];
@@ -21,46 +21,50 @@ const MAX_LEVEL = DRINKS.length;
 
 // ─── CANVAS & WORLD DIMS ─────────────────────────────────────
 let CW = 460, CH = 760;
-const WALL = 18;
-const CONT = { left: 55, right: 405, top: 155, floor: 720 };
-// Shooter line Y
-const SHOOT_Y = 125;
+const WALL = 50;   // thick enough to prevent tunneling by smallest drink (r=22)
+const CONT = { left: 60, right: 400, top: 155, floor: 715 };
+const SHOOT_Y = 118;
 
 // ─── STATE ───────────────────────────────────────────────────
 let canvas, ctx, engine, world;
 let drinks = [];          // active Matter bodies
 let mergeQueue = [];      // pending merges
 let particles = [];       // visual sparks
+let soldOutLabels = [];   // {x,y,life,scale} for SOLD OUT! overlays
 let score = 0, best = 0;
 let currentLevel = 1, nextLevel = 1;
 let shooterX = CW / 2;
 let canShoot = true, cooldown = 0;
 let gameOver = false;
-let aimLine = [];         // dashed aim preview dots
 let scale = 1;            // canvas CSS scale
-
-// Pre-rendered drink image cache
-const drinkCache = {};
+let collected = 0;        // how many royal elixirs collected
 
 // ─── INIT ────────────────────────────────────────────────────
 function init(restart) {
   // reset state
   score = 0;
+  collected = 0;
   gameOver = false;
   canShoot = true;
   cooldown = 0;
   particles = [];
+  soldOutLabels = [];
   mergeQueue = [];
   drinks = [];
+  document.getElementById('collected-val').textContent = '0';
   if (restart) {
     best = parseInt(localStorage.getItem('dm_best') || '0');
     document.getElementById('overlay-gameover').classList.add('hidden');
-    document.getElementById('overlay-win').classList.add('hidden');
   }
 
-  // Engine
-  if (engine) World.clear(world); // clear old world
-  engine = Engine.create({ gravity: { x: 0, y: 2.2 } });
+  // Engine — higher iterations prevent tunneling of fast small bodies
+  if (engine) { Events.off(engine); World.clear(world); }
+  engine = Engine.create({
+    gravity: { x: 0, y: 1.8 },
+    positionIterations: 12,
+    velocityIterations: 12,
+    constraintIterations: 4,
+  });
   world = engine.world;
   buildWalls();
 
@@ -72,13 +76,27 @@ function init(restart) {
 }
 
 function buildWalls() {
-  const cx = (CONT.left + CONT.right) / 2;
-  const ht = CONT.floor - CONT.top;
-  const opts = { isStatic:true, label:'wall', friction:0.4, restitution:0.25, frictionAir:0 };
+  const { left, right, top, floor } = CONT;
+  const cx  = (left + right) / 2;
+  const innerW = right - left;
+  const ht  = floor - top + WALL;
+
+  // Default collision filter: collides with everything
+  const opts = {
+    isStatic: true, label: 'wall',
+    friction: 0.5, restitution: 0.2,
+    frictionAir: 0,
+  };
+
   World.add(world, [
-    Bodies.rectangle(cx, CONT.floor + WALL/2, (CONT.right-CONT.left)+WALL*2, WALL, opts), // floor
-    Bodies.rectangle(CONT.left  - WALL/2, CONT.top + ht/2, WALL, ht, opts),                // left
-    Bodies.rectangle(CONT.right + WALL/2, CONT.top + ht/2, WALL, ht, opts),                // right
+    // Floor — very thick so small fast drinks can't tunnel through
+    Bodies.rectangle(cx, floor + WALL / 2, innerW + WALL * 4, WALL, opts),
+    // Left wall — inner face aligns exactly with CONT.left
+    Bodies.rectangle(left - WALL / 2, top + ht / 2, WALL, ht + WALL * 2, opts),
+    // Right wall
+    Bodies.rectangle(right + WALL / 2, top + ht / 2, WALL, ht + WALL * 2, opts),
+    // Safety catch-net far below canvas — teleports any tunnellers back up
+    Bodies.rectangle(cx, CH + 200, CW * 6, 80, { ...opts, label: 'catchnet' }),
   ]);
 }
 
@@ -163,16 +181,16 @@ function processMerges() {
     drinks = drinks.filter(d => d !== a && d !== b);
     if (nL <= MAX_LEVEL) {
       const nb = makeDrink(mx, my, nL);
-      nb.born = 0; // allow immediate merges on cascade
+      nb.born = 0;
       World.add(world, nb);
       drinks.push(nb);
       // explosion push
-      const force = 0.012 * nL;
+      const force = 0.013 * nL;
       drinks.forEach(d => {
         if (d === nb) return;
         const dx = d.position.x - mx, dy = d.position.y - my;
         const dist = Math.hypot(dx, dy) + 1;
-        if (dist < 220) {
+        if (dist < 240) {
           const f = force / dist;
           Body.applyForce(d, d.position, { x: dx*f, y: dy*f });
         }
@@ -182,12 +200,42 @@ function processMerges() {
       if (score > best) { best = score; localStorage.setItem('dm_best', best); }
       updateHUD();
       spawnPopup(mx * scale + (window.innerWidth - CW*scale)/2, my * scale, '+'+fmtN(pts));
-      spawnParticles(mx, my, DRINKS[nL-1].c1, 14);
+      spawnParticles(mx, my, DRINKS[nL-1].c1, 18);
       playMerge(nL);
-      if (nL === MAX_LEVEL) setTimeout(showWin, 800);
+      // Auto-collect max level drink after short settle delay
+      if (nL === MAX_LEVEL) {
+        nb.pendingCollect = true;
+        setTimeout(() => collectMaxDrink(nb), 1200);
+      }
     }
   });
   mergeQueue = [];
+}
+
+// ─── MAX LEVEL AUTO COLLECT ──────────────────────────────────
+function collectMaxDrink(body) {
+  if (!drinks.includes(body)) return;
+  const x = body.position.x, y = body.position.y;
+  World.remove(world, body);
+  drinks = drinks.filter(d => d !== body);
+  collected++;
+  // Big bonus
+  const bonus = DRINKS[MAX_LEVEL-1].pts * 2;
+  score += bonus;
+  if (score > best) { best = score; localStorage.setItem('dm_best', best); }
+  updateHUD();
+  document.getElementById('collected-val').textContent = collected;
+  // Massive particles
+  spawnParticles(x, y, '#ffd700', 30);
+  spawnParticles(x, y, '#fff', 20);
+  // SOLD OUT label
+  soldOutLabels.push({ x, y, life: 1.0, sc: 0 });
+  spawnPopup(
+    x * scale + (window.innerWidth - CW*scale)/2,
+    y * scale,
+    '🎉 +'+fmtN(bonus)
+  );
+  playCollect();
 }
 
 // ─── PARTICLES ───────────────────────────────────────────────
@@ -273,41 +321,140 @@ function drawContainer() {
 }
 
 // ─── DRAW DRINKS ─────────────────────────────────────────────
+const NOW = () => Date.now();
+let _t = 0; // time for animations
+
 function drawDrink(body) {
   const { x, y } = body.position;
   const lv = body.drinkLevel;
   const r  = body.radius;
   const d  = DRINKS[lv-1];
+  const isMax = lv === MAX_LEVEL;
+  const isHigh = lv >= 8;
 
   ctx.save();
   ctx.translate(x, y);
+
+  // Outer glow for high-level drinks
+  if (lv >= 5) {
+    const glowR = r + 6 + lv * 1.5;
+    const glow = ctx.createRadialGradient(0, 0, r*0.8, 0, 0, glowR);
+    glow.addColorStop(0, d.c1 + 'aa');
+    glow.addColorStop(1, d.c1 + '00');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0, 0, glowR, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Pulsing ring for max level
+  if (isMax) {
+    const pulse = 0.5 + 0.5 * Math.sin(_t * 0.006);
+    ctx.strokeStyle = `rgba(255,215,0,${0.5 + pulse * 0.5})`;
+    ctx.lineWidth = 4 + pulse * 4;
+    ctx.beginPath(); ctx.arc(0, 0, r + 8 + pulse * 6, 0, Math.PI*2); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,255,${0.3 + pulse * 0.3})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, r + 16 + pulse * 4, 0, Math.PI*2); ctx.stroke();
+  }
+
   ctx.rotate(body.angle);
 
-  // Shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  ctx.beginPath(); ctx.ellipse(0, r*0.85, r*0.75, r*0.22, 0, 0, Math.PI*2); ctx.fill();
+  // Drop shadow
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = r * 0.5;
+  ctx.shadowOffsetY = r * 0.25;
+  ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
 
-  // Body gradient
-  const g = ctx.createRadialGradient(-r*.3,-r*.3,r*.08, 0,0,r);
-  g.addColorStop(0, d.c1); g.addColorStop(1, d.c2);
+  // Main body - 3-stop radial gradient for depth
+  const g = ctx.createRadialGradient(-r*.35, -r*.35, r*0.05, 0, 0, r);
+  g.addColorStop(0,   lighten(d.c1, 40));
+  g.addColorStop(0.5, d.c1);
+  g.addColorStop(1,   d.c2);
   ctx.fillStyle = g;
-  ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill();
 
-  // Shine
-  ctx.fillStyle = 'rgba(255,255,255,0.28)';
-  ctx.beginPath(); ctx.ellipse(-r*.28,-r*.3, r*.32, r*.2, -0.5, 0, Math.PI*2); ctx.fill();
+  // Inner ring detail
+  ctx.strokeStyle = d.c1 + '88';
+  ctx.lineWidth = Math.max(1.5, r * 0.06);
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.78, 0, Math.PI*2); ctx.stroke();
+
+  // Glossy top shine (teardrop)
+  const sg = ctx.createRadialGradient(-r*.25, -r*.32, 0, -r*.1, -r*.2, r*.55);
+  sg.addColorStop(0, 'rgba(255,255,255,0.72)');
+  sg.addColorStop(0.6, 'rgba(255,255,255,0.15)');
+  sg.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sg;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill();
+
+  // Bottom reflection
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.beginPath(); ctx.ellipse(0, r*.6, r*.4, r*.12, 0, 0, Math.PI*2); ctx.fill();
 
   // Border
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = isMax ? 'rgba(255,215,0,0.9)' : 'rgba(255,255,255,0.6)';
+  ctx.lineWidth = isMax ? 3 : 2;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.stroke();
 
-  // Emoji
-  ctx.font = `${Math.round(r * 1.15)}px serif`;
+  // Emoji — slightly above center
+  const emojiSize = Math.round(r * (lv <= 2 ? 1.05 : 1.1));
+  ctx.font = `${emojiSize}px serif`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(d.emoji, 0, 2);
+  ctx.fillText(d.emoji, 0, r * 0.05);
+
+  // Level badge (small circle bottom-right)
+  const bx = r * 0.62, by = r * 0.62, br = r * 0.26;
+  ctx.fillStyle = isMax ? '#ffd700' : '#222';
+  ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${Math.round(br * 1.35)}px Nunito, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(lv, bx, by + 1);
+
+  // Sparkle stars for high-level drinks
+  if (isHigh) {
+    drawSparkles(r, lv, _t);
+  }
 
   ctx.restore();
+}
+
+function lighten(hex, amt) {
+  // Parse hex and lighten each channel
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, (n >> 16) + amt);
+  const g = Math.min(255, ((n >> 8) & 0xff) + amt);
+  const b = Math.min(255, (n & 0xff) + amt);
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawSparkles(r, lv, t) {
+  const count = Math.min(lv - 6, 6);
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI*2 / count) * i + t * 0.0025 * (i % 2 ? 1 : -1);
+    const dist  = r * 1.1 + Math.sin(t * 0.005 + i) * r * 0.12;
+    const sx = Math.cos(angle) * dist;
+    const sy = Math.sin(angle) * dist;
+    const ss = 2 + Math.abs(Math.sin(t * 0.007 + i * 1.3)) * 3;
+    ctx.fillStyle = '#fff';
+    // 4-pointed star
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(t * 0.004 + i);
+    ctx.beginPath();
+    for (let p = 0; p < 4; p++) {
+      const a = (Math.PI/2) * p;
+      ctx.lineTo(Math.cos(a)*ss, Math.sin(a)*ss);
+      ctx.lineTo(Math.cos(a+Math.PI/4)*ss*0.35, Math.sin(a+Math.PI/4)*ss*0.35);
+    }
+    ctx.closePath();
+    ctx.globalAlpha = 0.75;
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawAllDrinks() {
@@ -318,8 +465,48 @@ function drawParticles() {
   particles.forEach(p => {
     ctx.save();
     ctx.globalAlpha = Math.max(0, p.life);
+    // Star-shaped particles for better look
     ctx.fillStyle = p.col;
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.life * 3);
+    ctx.beginPath();
+    ctx.arc(0, 0, p.size, 0, Math.PI*2);
+    ctx.fill();
+    // inner lighter circle
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = Math.max(0, p.life * 0.4);
+    ctx.beginPath(); ctx.arc(0, 0, p.size * 0.4, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+}
+
+// ─── SOLD OUT LABELS ─────────────────────────────────────────
+function tickSoldOut() {
+  soldOutLabels = soldOutLabels.filter(s => s.life > 0);
+  soldOutLabels.forEach(s => { s.life -= 0.012; s.sc = Math.min(1, s.sc + 0.06); s.y -= 0.8; });
+}
+
+function drawSoldOutLabels() {
+  soldOutLabels.forEach(s => {
+    ctx.save();
+    ctx.globalAlpha = s.life;
+    ctx.translate(s.x, s.y);
+    ctx.scale(s.sc, s.sc);
+    // Badge background
+    ctx.fillStyle = '#ff2255';
+    const tw = 130, th = 44;
+    ctx.beginPath();
+    ctx.roundRect(-tw/2, -th/2, tw, th, 10);
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Text
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 22px Fredoka One, cursive';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🎉 SOLD OUT!', 0, 1);
     ctx.restore();
   });
 }
@@ -414,11 +601,17 @@ function playMerge(lv) {
   tone(f,'sine',0.25,0.3);
   setTimeout(()=>tone(f*1.5,'sine',0.18,0.22),110);
 }
+function playCollect() {
+  // Victory jingle
+  [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,'sine',0.3,0.3),i*100));
+}
 
-// ─── GAME OVER / WIN ─────────────────────────────────────────
+// ─── GAME OVER ───────────────────────────────────────────────
 function checkGameOver() {
   for (const b of drinks) {
-    if (!b.merging && b.position.y - b.radius < CONT.top + 10 && Date.now() - b.born > 2200) {
+    if (!b.merging && !b.pendingCollect &&
+        b.position.y - b.radius < CONT.top + 10 &&
+        Date.now() - b.born > 2200) {
       endGame(); return;
     }
   }
@@ -428,10 +621,6 @@ function endGame() {
   document.getElementById('final-score').textContent = fmtN(score);
   document.getElementById('final-best').textContent  = fmtN(best);
   setTimeout(()=>document.getElementById('overlay-gameover').classList.remove('hidden'), 800);
-}
-function showWin() {
-  gameOver = true;
-  document.getElementById('overlay-win').classList.remove('hidden');
 }
 
 // ─── INPUT ───────────────────────────────────────────────────
@@ -446,21 +635,58 @@ function setupInput() {
   canvas.addEventListener('touchend',  e => { e.preventDefault(); if(!gameOver) shoot(toCanvasX(e.changedTouches[0].clientX)); }, {passive:false});
 
   document.getElementById('btn-restart').addEventListener('click', () => { init(true); });
-  document.getElementById('btn-win-restart').addEventListener('click', () => { init(true); });
 }
 
 // ─── MAIN LOOP ────────────────────────────────────────────────
 let last = 0;
+
+// Safety: teleport any drink that escaped the container back inside
+function reclaimEscaped() {
+  drinks.forEach(b => {
+    if (b.merging || b.pendingCollect) return;
+    const { x, y } = b.position;
+    const r = b.radius;
+    let nx = x, ny = y, moved = false;
+
+    // Fell below floor
+    if (y - r > CONT.floor + 5) {
+      ny = CONT.floor - r - 2;
+      moved = true;
+    }
+    // Escaped left
+    if (x - r < CONT.left - 5) {
+      nx = CONT.left + r + 2;
+      moved = true;
+    }
+    // Escaped right
+    if (x + r > CONT.right + 5) {
+      nx = CONT.right - r - 2;
+      moved = true;
+    }
+    if (moved) {
+      Body.setPosition(b, { x: nx, y: ny });
+      Body.setVelocity(b, { x: 0, y: -1 }); // small upward nudge
+    }
+  });
+}
+
 function loop(ts) {
   const dt = Math.min(ts - last, 48);
   last = ts;
+  _t = ts; // global time for animations
 
-  Engine.update(engine, dt || 16.67);
+  // Sub-step physics for better small-body collision accuracy
+  const steps = 3;
+  Engine.update(engine, (dt || 16.67) / steps);
+  Engine.update(engine, (dt || 16.67) / steps);
+  Engine.update(engine, (dt || 16.67) / steps);
 
   if (!canShoot) { cooldown -= dt; if (cooldown <= 0) canShoot = true; }
 
+  reclaimEscaped();
   processMerges();
   tickParticles();
+  tickSoldOut();
   if (!gameOver) checkGameOver();
 
   // Draw
@@ -469,6 +695,7 @@ function loop(ts) {
   drawContainer();
   drawAllDrinks();
   drawParticles();
+  drawSoldOutLabels();
   drawShooter();
 
   requestAnimationFrame(loop);

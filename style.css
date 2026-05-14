@@ -1,16 +1,21 @@
+/* ================================================
+   DRINKS MERGE – Stylesheet
+   Premium Tropical UI
+   ================================================ */
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
   background: #1a8fc1;
   overflow: hidden;
   font-family: 'Nunito', sans-serif;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   height: 100vh;
   width: 100vw;
 }
 
+/* ================================================
+   HUD BAR
+   ================================================ */
 #hud {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -18,35 +23,173 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
-  background: rgba(0,0,0,0.35);
-  backdrop-filter: blur(8px);
+  padding: 10px 14px;
+  /* Deep tropical gradient */
+  background: linear-gradient(180deg, rgba(5,30,60,0.92) 0%, rgba(5,30,60,0.7) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1.5px solid rgba(255,255,255,0.1);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
 }
-.hud-box {
-  text-align: center;
-  background: rgba(255,255,255,0.15);
-  border-radius: 12px;
-  padding: 4px 16px;
-  min-width: 70px;
-}
-.hud-label { font-size: 0.55rem; font-weight: 800; color: rgba(255,255,255,0.75); letter-spacing: 0.1em; }
-#score-val, #best-val { font-family: 'Fredoka One', cursive; font-size: 1.3rem; color: #ffe566; }
-#hud-title { font-family: 'Fredoka One', cursive; font-size: 1.1rem; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
 
+/* ── PILL CARDS ── */
+.hud-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1.5px solid rgba(255,255,255,0.14);
+  border-radius: 14px;
+  padding: 6px 14px 6px 10px;
+  min-width: 88px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle inner shimmer line */
+.hud-pill::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+}
+
+.hud-pill--gold {
+  background: linear-gradient(135deg, rgba(255,215,0,0.18), rgba(180,100,0,0.12));
+  border-color: rgba(255,215,0,0.38);
+  box-shadow: 0 0 14px rgba(255,200,0,0.15);
+}
+
+.hud-pill__icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.07);
+  border-radius: 8px;
+  padding: 4px;
+}
+.hud-pill__icon svg { width: 100%; height: 100%; }
+
+.hud-pill__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+
+.hud-pill__label {
+  font-size: 0.5rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.hud-pill__val {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.25rem;
+  color: #ffe566;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+  line-height: 1;
+}
+
+#pill-sold .hud-pill__val { color: #ffd700; }
+
+/* ── TITLE ── */
+#hud-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.2rem;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0,150,255,0.5), 0 1px 4px rgba(0,0,0,0.4);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+#hud-logo-icon {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 6px rgba(255,100,80,0.5));
+  animation: logo-bob 2.8s ease-in-out infinite;
+}
+
+@keyframes logo-bob {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-3px); }
+}
+
+/* ── RIGHT GROUP ── */
+.hud-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ================================================
+   NEXT DRINK PANEL
+   ================================================ */
 #next-panel {
   position: fixed;
-  top: 56px; right: 10px;
+  top: 68px;
+  right: 12px;
   z-index: 20;
-  background: rgba(0,0,0,0.4);
-  backdrop-filter: blur(8px);
-  border-radius: 14px;
-  padding: 8px 12px;
-  text-align: center;
-  border: 1.5px solid rgba(255,255,255,0.25);
-}
-.next-label { display: block; font-size: 0.55rem; font-weight: 800; color: rgba(255,255,255,0.7); letter-spacing: 0.1em; margin-bottom: 4px; }
-#next-drink { font-size: 2rem; line-height: 1; }
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 
+  background: linear-gradient(160deg, rgba(5,30,60,0.88), rgba(5,30,60,0.65));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 16px;
+  border: 1.5px solid rgba(255,255,255,0.13);
+  padding: 10px 12px 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+  min-width: 62px;
+}
+
+.next-arrow {
+  width: 14px;
+  height: 20px;
+  opacity: 0.55;
+  animation: arrow-bounce 1.2s ease-in-out infinite;
+}
+@keyframes arrow-bounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(3px); }
+}
+
+.next-label {
+  font-size: 0.5rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+#next-drink {
+  font-size: 2.2rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));
+  animation: next-pop 0.3s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+@keyframes next-pop {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+/* ================================================
+   GAME CANVAS
+   ================================================ */
 #gameCanvas {
   position: fixed;
   top: 0; left: 50%;
@@ -56,7 +199,9 @@ body {
   cursor: crosshair;
 }
 
-/* Popups */
+/* ================================================
+   SCORE POPUPS
+   ================================================ */
 #popups { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
 .popup {
   position: absolute;
@@ -72,40 +217,136 @@ body {
   100% { opacity: 0; transform: translateY(-60px) scale(1.2); }
 }
 
-/* Overlays */
+/* ================================================
+   GAME OVER OVERLAY
+   ================================================ */
 .overlay {
   position: fixed; inset: 0; z-index: 100;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(8px);
-  animation: fade-in 0.3s ease;
+  background: rgba(0,10,30,0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: fade-in 0.35s ease;
 }
 .overlay.hidden { display: none; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
 .ov-card {
-  background: linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0.08));
-  border: 1.5px solid rgba(255,255,255,0.4);
-  border-radius: 24px;
-  padding: 36px 48px;
+  background: linear-gradient(160deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04));
+  border: 1.5px solid rgba(255,255,255,0.22);
+  border-radius: 28px;
+  padding: 32px 44px 36px;
   text-align: center;
   color: #fff;
-  animation: card-pop 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12);
+  animation: card-pop 0.45s cubic-bezier(0.175,0.885,0.32,1.275);
+  max-width: 340px;
+  width: 90%;
+  position: relative;
+  overflow: hidden;
 }
-.ov-card.gold { border-color: gold; background: linear-gradient(135deg, rgba(255,215,0,0.3), rgba(180,80,0,0.2)); }
-@keyframes card-pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-.ov-icon { font-size: 3.5rem; margin-bottom: 10px; }
-.ov-card h2 { font-family: 'Fredoka One', cursive; font-size: 2rem; color: #ffe566; margin-bottom: 8px; }
-.ov-card p  { font-size: 0.95rem; font-weight: 700; color: rgba(255,255,255,0.85); margin-bottom: 14px; }
-.ov-scores  { display: flex; gap: 20px; justify-content: center; font-size: 1rem; font-weight: 700; margin-bottom: 20px; }
-.ov-scores strong { font-family: 'Fredoka One', cursive; font-size: 1.4rem; color: #ffe566; }
+
+/* Rainbow shimmer top edge */
+.ov-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #ff6b6b, #ffd700, #55efc4, #74b9ff, #fd79a8);
+  background-size: 200% 100%;
+  animation: shimmer-slide 3s linear infinite;
+}
+@keyframes shimmer-slide { 0% { background-position: 0% } 100% { background-position: 200% } }
+
+@keyframes card-pop {
+  from { transform: scale(0.65) translateY(20px); opacity: 0; }
+  to   { transform: scale(1)    translateY(0);    opacity: 1; }
+}
+
+/* SVG illustration */
+.ov-svg {
+  width: 90px;
+  height: 90px;
+  margin: 0 auto 12px;
+  display: block;
+  filter: drop-shadow(0 4px 12px rgba(255,80,60,0.4));
+  animation: ov-wobble 0.6s ease forwards;
+}
+@keyframes ov-wobble {
+  0%   { transform: rotate(-15deg) scale(0.5); opacity: 0; }
+  60%  { transform: rotate(8deg) scale(1.1); opacity: 1; }
+  80%  { transform: rotate(-4deg) scale(0.97); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+.ov-card h2 {
+  font-family: 'Fredoka One', cursive;
+  font-size: 2rem;
+  color: #ffe566;
+  text-shadow: 0 2px 12px rgba(255,200,0,0.4);
+  margin-bottom: 6px;
+}
+.ov-card p {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 20px;
+}
+
+/* Score boxes inside overlay */
+.ov-scores {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+.ov-score-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 14px;
+  padding: 10px 20px;
+  min-width: 90px;
+}
+.ov-score-box svg { width: 20px; height: 20px; }
+.ov-score-box span {
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.ov-score-box strong {
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.5rem;
+  color: #ffe566;
+  line-height: 1;
+}
+
+/* Restart button */
 .ov-card button {
-  background: linear-gradient(135deg, #ffe066, #ff9500);
-  color: #fff; font-family: 'Fredoka One', cursive;
-  font-size: 1.15rem; border: none; border-radius: 16px;
-  padding: 12px 32px; cursor: pointer;
-  box-shadow: 0 6px 20px rgba(255,150,0,0.45);
-  transition: transform 0.15s, box-shadow 0.15s;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #ffe066 0%, #ff9500 100%);
+  color: #fff;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 50px;
+  padding: 13px 32px;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(255,150,0,0.5), inset 0 1px 0 rgba(255,255,255,0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  letter-spacing: 0.02em;
 }
-.ov-card button:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(255,150,0,0.55); }
+.ov-card button svg { width: 18px; height: 18px; }
+.ov-card button:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 10px 28px rgba(255,150,0,0.6);
+}
+.ov-card button:active { transform: scale(0.97); }

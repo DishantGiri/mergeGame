@@ -60,7 +60,7 @@ function init(restart) {
   // Engine — higher iterations prevent tunneling of fast small bodies
   if (engine) { Events.off(engine); World.clear(world); }
   engine = Engine.create({
-    gravity: { x: 0, y: 1.8 },
+    gravity: { x: 0, y: 1.25 },
     positionIterations: 12,
     velocityIterations: 12,
     constraintIterations: 4,
@@ -137,6 +137,7 @@ function makeDrink(x, y, level) {
   b.drinkLevel = level;
   b.radius = d.r;
   b.merging = false;
+  b.renderScale = 1.0;
   b.born = Date.now();
   return b;
 }
@@ -182,15 +183,16 @@ function processMerges() {
     if (nL <= MAX_LEVEL) {
       const nb = makeDrink(mx, my, nL);
       nb.born = 0;
+      nb.renderScale = 0.3;
       World.add(world, nb);
       drinks.push(nb);
-      // explosion push
-      const force = 0.013 * nL;
+      // explosion push - slightly reduced for 'slower' feel
+      const force = 0.011 * nL;
       drinks.forEach(d => {
         if (d === nb) return;
         const dx = d.position.x - mx, dy = d.position.y - my;
         const dist = Math.hypot(dx, dy) + 1;
-        if (dist < 240) {
+        if (dist < 220) {
           const f = force / dist;
           Body.applyForce(d, d.position, { x: dx*f, y: dy*f });
         }
@@ -327,7 +329,7 @@ let _t = 0; // time for animations
 function drawDrink(body) {
   const { x, y } = body.position;
   const lv = body.drinkLevel;
-  const r  = body.radius;
+  const r  = body.radius * (body.renderScale || 1.0);
   const d  = DRINKS[lv-1];
   const isMax = lv === MAX_LEVEL;
   const isHigh = lv >= 8;
@@ -682,6 +684,14 @@ function loop(ts) {
   Engine.update(engine, (dt || 16.67) / steps);
 
   if (!canShoot) { cooldown -= dt; if (cooldown <= 0) canShoot = true; }
+
+  // Update visual scale for growth animation
+  drinks.forEach(b => {
+    if (b.renderScale < 1.0) {
+      b.renderScale += 0.04;
+      if (b.renderScale > 1.0) b.renderScale = 1.0;
+    }
+  });
 
   reclaimEscaped();
   processMerges();
